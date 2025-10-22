@@ -1,6 +1,12 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Debug)]
+pub enum AltitudeValue {
+    Numeric(f64),
+    Ground(String),
+}
+
+#[derive(Deserialize, Serialize, Debug)]
 pub struct Dump1090Root {
     pub now: Option<f64>,
     pub messages: Option<u64>,
@@ -13,7 +19,7 @@ pub struct AircraftData {
     pub flight: Option<String>,
     pub lat: Option<f64>,
     pub lon: Option<f64>,
-    pub alt_baro: Option<f64>,
+    pub alt_baro: Option<AltitudeValue>,
     pub alt_geom: Option<f64>,
     pub alt: Option<f64>,
     pub gs: Option<f64>,
