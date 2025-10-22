@@ -1,0 +1,24 @@
+[package]
+name = "dump1090_zenoh_bridge"
+version = "0.1.0"
+edition = "2024"
+[[bin]]
+name = "dump1090_publisher"
+path = "src/dump1090_publisher.rs"
+
+[[bin]]
+name = "zenoh_to_foxglove"
+path = "src/zenoh_to_foxglove.rs"
+
+[dependencies]
+zenoh = "0.11"
+reqwest = { version = "0.11", features = ["json"] }
+tokio = { version = "1", features = ["full"] }
+serde_json = "1.0"
+tokio-tungstenite = "0.20"
+futures-util = "0.3"
+url = "2"
+foxglove = "0.14.3"
+serde = "1.0.228"
+anyhow = "1.0.100"
+chrono = "0.4.42"
