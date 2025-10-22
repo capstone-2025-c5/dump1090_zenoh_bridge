@@ -3,7 +3,7 @@ use tokio::time::sleep;
 use zenoh::prelude::r#async::*;
 use std::env;
 mod types;
-use types::{Dump1090Root, AircraftData};
+use types::AircraftData;
 
 #[tokio::main]
 async fn main() -> zenoh::Result<()> {
@@ -13,7 +13,7 @@ async fn main() -> zenoh::Result<()> {
         args[1].clone()
     } else {
         // default endpoint
-        "http://localhost:8080/data/aircraft.json".to_string()
+        "http://192.168.50.50:8080/data/aircraft.json".to_string()
     };
 
     // Create Zenoh session
@@ -24,40 +24,43 @@ async fn main() -> zenoh::Result<()> {
         // Fetch JSON over HTTP
         match reqwest::get(&url).await {
             Ok(resp) => match resp.text().await {
-                Ok(data) => match serde_json::from_str::<Dump1090Root>(&data) {
-                  Ok(root) => {
-                    let mut out: Vec<AircraftData> = Vec::new();
-                    if let Some(list) = root.aircraft {
-                      for a in list.into_iter() {
-                        // skip entries without a hex
-                        let hex = match a.hex {
-                          Some(h) => h,
-                          None => continue,
-                        };
-                        out.push(AircraftData {
-                          hex: Some(hex),
-                          flight: a.flight,
-                          lat: a.lat,
-                          lon: a.lon,
-                          alt_baro: a.alt_baro,
-                          alt_geom: a.alt_geom,
-                          alt: a.alt,
-                          gs: a.gs,
-                          ias: a.ias,
-                          tas: a.tas,
-                          mach: a.mach,
-                          track: a.track,
-                          track_rate: a.track_rate,
-                          roll: a.roll,
-                          mag_heading: a.mag_heading,
-                          true_heading: a.true_heading,
-                          baro_rate: a.baro_rate,
-                          geom_rate: a.geom_rate,
-                          seen: a.seen,
-                          rssi: a.rssi,
-                        });
+                Ok(data) => {
+                  // First parse into a generic JSON value so we can handle slight variations
+                  let mut out: Vec<AircraftData> = Vec::new();
+                  match serde_json::from_str::<serde_json::Value>(&data) {
+                    Ok(val) => {
+                      match val.get("aircraft") {
+                        Some(aircraft_val) => {
+                          if let Some(list) = aircraft_val.as_array() {
+                            for elem in list.iter() {
+                              match serde_json::from_value::<AircraftData>(elem.clone()) {
+                                Ok(a) => {
+                                  // skip entries without a hex
+                                  match &a.hex {
+                                    Some(h) if !h.is_empty() => out.push(a),
+                                    _ => continue,
+                                  }
+                                }
+                                Err(e) => eprintln!("Failed to deserialize aircraft entry: {:?}\nelement={}", e, elem),
+                              }
+                            }
+                          } else {
+                            eprintln!("'aircraft' field is present but not an array");
+                          }
+                        }
+                        None => eprintln!("No 'aircraft' field in JSON response"),
                       }
                     }
+                    Err(e) => {
+                      let preview = if data.len() > 500 {
+                        format!("{}... (len={})", &data[..500], data.len())
+                      } else {
+                        data.clone()
+                      };
+                      eprintln!("JSON parse error (invalid JSON): {:?}\nresponse preview: {}", e, preview);
+                      continue;
+                    }
+                  }
 
                     match serde_json::to_string(&out) {
                       Ok(json_string) => {
@@ -75,8 +78,6 @@ async fn main() -> zenoh::Result<()> {
                       }
                       Err(e) => eprintln!("Serialization error: {:?}", e),
                     }
-                  }
-                  Err(e) => eprintln!("JSON parse error (expected object with 'aircraft'): {:?}", e),
                 },
                 Err(e) => eprintln!("Failed to read response body from {}: {:?}", url, e),
             },

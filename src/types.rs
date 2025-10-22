@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+#[serde(untagged)]
 #[derive(Deserialize, Serialize, Debug)]
 pub enum AltitudeValue {
     Numeric(f64),
